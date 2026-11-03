@@ -1,0 +1,122 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-hh-resume
+      author: hh-clicker
+      changes:
+        - createTable:
+            tableName: hh_resume
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: account_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: hh_resume_id
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: professional_role
+                  type: varchar(160)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: area
+                  type: varchar(120)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sync_status
+                  type: varchar(32)
+                  defaultValue: OUTDATED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: synced_at
+                  type: timestamp with time zone
+              - column:
+                  name: cover_letter
+                  type: text
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: daily_limit
+                  type: integer
+                  defaultValueNumeric: 20
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pause_from_seconds
+                  type: integer
+                  defaultValueNumeric: 30
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pause_to_seconds
+                  type: integer
+                  defaultValueNumeric: 90
+                  constraints:
+                    nullable: false
+              - column:
+                  name: skip_questionnaires
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: hh_resume
+            baseColumnNames: account_id
+            referencedTableName: hh_account
+            referencedColumnNames: id
+            constraintName: fk_hh_resume_account
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            tableName: hh_resume
+            columnNames: hh_resume_id
+            constraintName: uq_hh_resume_hh_resume_id
+        - createIndex:
+            tableName: hh_resume
+            indexName: idx_hh_resume_account_id
+            columns:
+              - column:
+                  name: account_id
+        - sql:
+            sql: >-
+              alter table hh_resume
+              add constraint chk_hh_resume_sync_status
+              check (sync_status in ('SYNCED', 'OUTDATED'))
+        - sql:
+            sql: >-
+              alter table hh_resume
+              add constraint chk_hh_resume_automation_settings
+              check (
+                daily_limit between 1 and 500
+                and pause_from_seconds >= 10
+                and pause_to_seconds >= pause_from_seconds
+              )
+

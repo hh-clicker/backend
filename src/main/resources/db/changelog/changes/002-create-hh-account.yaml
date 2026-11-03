@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-hh-account
+      author: hh-clicker
+      changes:
+        - createTable:
+            tableName: hh_account
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: hh_user_id
+                  type: varchar(100)
+              - column:
+                  name: authorization_status
+                  type: varchar(32)
+                  defaultValue: REQUIRED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: hh_account
+            columnNames: hh_user_id
+            constraintName: uq_hh_account_hh_user_id
+        - sql:
+            sql: >-
+              alter table hh_account
+              add constraint chk_hh_account_authorization_status
+              check (authorization_status in ('REQUIRED', 'AUTHORIZED'))
+

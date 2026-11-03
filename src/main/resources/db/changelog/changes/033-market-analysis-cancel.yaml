@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 033-market-analysis-cancel
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table market_analysis_run drop constraint market_analysis_run_status_check;
+              alter table market_analysis_run add constraint market_analysis_run_status_check
+                check (status in ('RUNNING', 'STOPPING', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED'));

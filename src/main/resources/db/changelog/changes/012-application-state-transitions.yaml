@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-application-state-transitions
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table application_run add column consecutive_failures integer not null default 0;
+              update application_run r set status = 'COMPLETED', finished_at = coalesce(finished_at, now())
+              where status not in ('COMPLETED', 'CANCELLED') and not exists (
+                select 1 from application_item i where i.run_id = r.id and i.status in ('QUEUED', 'IN_PROGRESS')
+              );

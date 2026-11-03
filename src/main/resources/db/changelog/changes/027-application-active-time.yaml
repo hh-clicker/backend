@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-application-active-time
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table application_run
+                add column active_seconds bigint not null default 0 check (active_seconds >= 0),
+                add column active_since timestamptz,
+                add column eta_processed_baseline bigint not null default 0 check (eta_processed_baseline >= 0);
+
+              update application_run r set eta_processed_baseline = (
+                select count(*) from application_item i
+                where i.run_id = r.id and i.status not in ('QUEUED', 'IN_PROGRESS')
+              );
+
+              update application_run set active_since = clock_timestamp() where status = 'RUNNING';
+        - sql:
+            splitStatements: false
+            sql: |
+              create function track_application_run_active_time() returns trigger as $$
+              declare
+                transition_at timestamptz := clock_timestamp();
+              begin
+                if tg_op = 'INSERT' then
+                  if new.status = 'RUNNING' and new.active_since is null then
+                    new.active_since := transition_at;
+                  end if;
+                  return new;
+                end if;
+
+                if old.status = 'RUNNING' and new.status <> 'RUNNING' then
+                  if old.active_since is not null then
+                    new.active_seconds := old.active_seconds
+                      + greatest(0, floor(extract(epoch from (transition_at - old.active_since))))::bigint;
+                  end if;
+                  new.active_since := null;
+                elsif old.status <> 'RUNNING' and new.status = 'RUNNING' then
+                  new.active_since := transition_at;
+                end if;
+                return new;
+              end;
+              $$ language plpgsql;
+        - sql:
+            sql: |
+              create trigger application_run_active_time
+                before insert or update of status on application_run
+                for each row execute function track_application_run_active_time();

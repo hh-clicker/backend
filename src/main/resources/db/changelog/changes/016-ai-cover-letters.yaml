@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-ai-cover-letters
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table hh_resume add column ai_letter_enabled boolean not null default false;
+              alter table hh_resume add column ai_letter_template text;
+              alter table hh_resume add column ai_letter_max_length integer not null default 1500;
+              alter table application_run add column ai_letter_enabled boolean not null default false;
+              alter table application_run add column ai_letter_template text;
+              alter table application_run add column ai_letter_max_length integer not null default 1500;
+              alter table application_run add column resume_plain_text text;
+              alter table application_item add column letter_text text;
+              alter table application_item add column letter_source varchar(16);
+              alter table application_item add column letter_error_code varchar(64);
+              alter table application_item add column generation_id uuid;

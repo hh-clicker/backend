@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-market-analysis
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table market_analysis_run (
+                id uuid primary key,
+                resume_id uuid not null references hh_resume(id) on delete cascade,
+                resume_name text not null,
+                resume_text text not null,
+                created_at timestamptz not null default now(),
+                updated_at timestamptz not null default now(),
+                status varchar(16) not null check (status in ('RUNNING', 'COMPLETED', 'FAILED')),
+                phase varchar(16) not null check (phase in ('EXTRACT', 'COVERAGE', 'DONE')),
+                position integer not null default 0,
+                job_id uuid,
+                sources_json jsonb not null,
+                facts_json jsonb not null default '[]'::jsonb,
+                coverage_json jsonb not null default '[]'::jsonb,
+                report_markdown text,
+                error_message text
+              );
+              create index market_analysis_by_resume on market_analysis_run (resume_id, created_at desc);
+              create unique index market_analysis_one_active_per_resume on market_analysis_run (resume_id) where status = 'RUNNING';

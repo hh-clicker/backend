@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 036-market-analysis-batches
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table market_analysis_batch (
+                run_id uuid not null references market_analysis_run(id) on delete cascade,
+                batch_index integer not null check (batch_index >= 0),
+                start_position integer not null check (start_position >= 0),
+                batch_size integer not null check (batch_size between 1 and 8),
+                status varchar(16) not null check (status in ('READY','SUBMITTING','SUBMITTED','DONE','FAILED','CANCELLED')),
+                attempt integer not null default 0 check (attempt >= 0),
+                job_id uuid,
+                error_code varchar(80),
+                error_message text,
+                primary key (run_id, batch_index)
+              );

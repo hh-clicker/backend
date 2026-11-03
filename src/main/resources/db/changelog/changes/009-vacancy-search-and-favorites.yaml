@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-vacancy-search-and-favorites
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table vacancy alter column employer_id drop not null;
+              alter table vacancy alter column published_at drop not null;
+              alter table vacancy alter column has_questionnaire drop not null;
+              alter table vacancy alter column has_questionnaire drop default;
+              alter table vacancy drop column description;
+              alter table vacancy add column salary_text varchar(500) not null default '';
+              drop table vacancy_skill;
+              create table vacancy_label (
+                vacancy_id uuid not null references vacancy(id) on delete cascade,
+                position integer not null,
+                name varchar(200) not null,
+                primary key (vacancy_id, position)
+              );
+              create table vacancy_favorite (
+                account_id uuid not null references hh_account(id) on delete cascade,
+                hh_vacancy_id varchar(64) not null,
+                primary key (account_id, hh_vacancy_id)
+              );
+              create table employer_favorite (
+                account_id uuid not null references hh_account(id) on delete cascade,
+                employer_id varchar(64) not null,
+                primary key (account_id, employer_id)
+              );

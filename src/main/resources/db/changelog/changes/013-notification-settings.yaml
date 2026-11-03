@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-notification-settings
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table notification_settings (
+                id integer primary key check (id = 1),
+                desktop_enabled boolean not null default true,
+                sound_enabled boolean not null default true,
+                notify_run_completed boolean not null default true,
+                notify_run_paused boolean not null default true,
+                notify_attention_required boolean not null default true
+              );
+              insert into notification_settings (id) values (1);

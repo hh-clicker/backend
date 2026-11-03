@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-relevance-notifications
+      author: ${hhclicker.bootstrap.notificationsAuthor}
+      changes:
+        - addColumn:
+            tableName: notification_settings
+            columns:
+              - column:
+                  name: notify_relevance_completed
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false

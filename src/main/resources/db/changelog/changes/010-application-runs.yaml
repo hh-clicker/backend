@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-application-runs
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table application_run (
+                id uuid primary key,
+                sequence bigserial unique,
+                account_id uuid not null references hh_account(id),
+                resume_id uuid not null references hh_resume(id),
+                profile_id uuid not null references browser_profile(id),
+                hh_resume_id varchar(100) not null,
+                resume_name text not null,
+                status varchar(32) not null,
+                created_at timestamptz not null default now(),
+                finished_at timestamptz,
+                next_at timestamptz not null default now(),
+                daily_limit integer not null check (daily_limit between 1 and 500),
+                account_daily_limit integer not null check (account_daily_limit > 0),
+                pause_from_seconds integer not null check (pause_from_seconds >= 10),
+                pause_to_seconds integer not null check (pause_to_seconds >= pause_from_seconds),
+                cover_letter text not null,
+                skip_questionnaires boolean not null
+              );
+              create unique index application_one_active_run on application_run ((true))
+                where status not in ('COMPLETED', 'CANCELLED');
+              create table application_item (
+                id uuid primary key,
+                run_id uuid not null references application_run(id),
+                vacancy_id uuid not null references vacancy(id),
+                account_id uuid not null references hh_account(id),
+                hh_vacancy_id varchar(64) not null,
+                vacancy_title text not null,
+                company_name text not null,
+                source_url text not null,
+                search_page integer not null,
+                position integer not null,
+                status varchar(32) not null default 'QUEUED',
+                outcome varchar(64),
+                attention_status varchar(16) not null default 'OPEN',
+                attempted_at timestamptz,
+                submission_started_at timestamptz,
+                duplicate_guard boolean not null default false,
+                has_questionnaire boolean not null default false,
+                unique (run_id, vacancy_id)
+              );
+              create unique index application_no_duplicate_submission
+                on application_item (account_id, hh_vacancy_id) where duplicate_guard;
+              create index application_items_by_run on application_item (run_id, position);

@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-search-scan-progress
+      author: hh-clicker
+      changes:
+        - addColumn:
+            tableName: vacancy_search
+            columns:
+              - column:
+                  name: scan_started_at
+                  type: timestamp with time zone
+              - column:
+                  name: scan_current_page
+                  type: integer
+              - column:
+                  name: scan_total_pages
+                  type: integer
+              - column:
+                  name: scan_collected
+                  type: integer
+              - column:
+                  name: scan_total_results
+                  type: integer
+        - sql:
+            sql: >-
+              alter table vacancy_search
+              add constraint chk_vacancy_search_scan_progress
+              check (
+                (scan_current_page is null or scan_current_page >= 0)
+                and (scan_total_pages is null or scan_total_pages between 1 and pages_limit)
+                and (scan_collected is null or scan_collected >= 0)
+                and (scan_total_results is null or scan_total_results >= 0)
+                and (scan_current_page is null or scan_total_pages is null or scan_current_page <= scan_total_pages)
+                and (scan_collected is null or scan_total_results is null or scan_collected <= scan_total_results)
+              )

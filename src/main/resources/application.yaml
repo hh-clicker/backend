@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/hh_clicker}
+    username: ${DB_USERNAME:hh_clicker}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      schema: ${DB_SCHEMA:hhclicker}
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: ${DB_SCHEMA:hhclicker}
+    liquibase-schema: public
+
+server:
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+hh-clicker:
+  browser-agent:
+    offline-timeout: ${BROWSER_AGENT_OFFLINE_TIMEOUT:15s}
+    command-timeout: ${BROWSER_AGENT_COMMAND_TIMEOUT:30s}
+  generation-agent:
+    base-url: ${GENERATION_AGENT_URL:http://localhost:17374}

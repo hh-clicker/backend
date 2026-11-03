@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-add-unknown-authorization-status
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table hh_account drop constraint chk_hh_account_authorization_status;
+              alter table hh_account add constraint chk_hh_account_authorization_status
+                  check (authorization_status in ('REQUIRED', 'AUTHORIZED', 'UNKNOWN'));
+              alter table hh_account alter column authorization_status set default 'UNKNOWN';
+              -- До появления проверки статусы не подтверждались Browser Agent.
+              update hh_account set authorization_status = 'UNKNOWN';

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-vacancy-relevance
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table vacancy add column relevance_category varchar(16);
+              alter table vacancy add column relevance_confidence varchar(16);
+              alter table vacancy add column relevance_reason varchar(200);
+              alter table vacancy add column relevance_analyzed_at timestamptz;
+              alter table vacancy add constraint ck_vacancy_relevance_category
+                check (relevance_category is null or relevance_category in ('TARGET', 'ADJACENT', 'UNKNOWN', 'NOISE'));
+              alter table vacancy add constraint ck_vacancy_relevance_confidence
+                check (relevance_confidence is null or relevance_confidence in ('high', 'medium', 'low'));
+              alter table vacancy add constraint ck_vacancy_relevance_complete
+                check ((relevance_category is null and relevance_confidence is null and relevance_reason is null and relevance_analyzed_at is null)
+                  or (relevance_category is not null and relevance_confidence is not null and relevance_reason is not null and relevance_analyzed_at is not null));

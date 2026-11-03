@@ -1,0 +1,106 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-vacancy-search
+      author: hh-clicker
+      changes:
+        - createTable:
+            tableName: vacancy_search
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: resume_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_url
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_hash
+                  type: char(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pages_limit
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_vacancies
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_vacancies
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_scanned_at
+                  type: timestamp with time zone
+              - column:
+                  name: last_error
+                  type: text
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: vacancy_search
+            baseColumnNames: resume_id
+            referencedTableName: hh_resume
+            referencedColumnNames: id
+            constraintName: fk_vacancy_search_resume
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            tableName: vacancy_search
+            columnNames: resume_id, source_hash
+            constraintName: uq_vacancy_search_resume_source
+        - createIndex:
+            tableName: vacancy_search
+            indexName: idx_vacancy_search_resume_id
+            columns:
+              - column:
+                  name: resume_id
+        - sql:
+            sql: >-
+              alter table vacancy_search
+              add constraint chk_vacancy_search_status
+              check (status in ('ACTIVE', 'PAUSED', 'SCANNING', 'ERROR'))
+        - sql:
+            sql: >-
+              alter table vacancy_search
+              add constraint chk_vacancy_search_limits
+              check (
+                pages_limit between 1 and 20
+                and new_vacancies >= 0
+                and total_vacancies >= 0
+                and new_vacancies <= total_vacancies
+              )
+

@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-telegram-run-completions
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table telegram_run_message
+                add column completion_eligible boolean not null default false;
+
+              update telegram_run_message m set completion_eligible = true
+              from application_run r
+              where r.id = m.run_id and r.status not in ('COMPLETED', 'CANCELLED');
+
+              create table telegram_run_completion_message (
+                run_id uuid not null references application_run(id) on delete cascade,
+                bot_id bigint not null,
+                chat_id bigint not null,
+                message_id bigint not null,
+                fingerprint varchar(200) not null,
+                confirmed boolean not null default false,
+                cleaned boolean not null default false,
+                created_at timestamp with time zone not null default now(),
+                updated_at timestamp with time zone not null default now(),
+                primary key (run_id, bot_id, chat_id),
+                unique (bot_id, chat_id, message_id)
+              );

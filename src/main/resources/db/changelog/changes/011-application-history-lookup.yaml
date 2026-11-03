@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-application-history-lookup
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create index application_items_by_account_vacancy
+                on application_item (account_id, hh_vacancy_id);

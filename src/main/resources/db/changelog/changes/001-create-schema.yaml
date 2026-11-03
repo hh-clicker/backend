@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-schema
+      author: ${hhclicker.bootstrap.schemaAuthor}
+      changes:
+        - sql:
+            sql: CREATE SCHEMA IF NOT EXISTS hhclicker;

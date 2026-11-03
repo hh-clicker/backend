@@ -1,0 +1,389 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-vacancy
+      author: hh-clicker
+      changes:
+        - createTable:
+            tableName: vacancy
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: resume_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: hh_vacancy_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: varchar(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: employer_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: company_name
+                  type: varchar(300)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: salary_from
+                  type: bigint
+              - column:
+                  name: salary_to
+                  type: bigint
+              - column:
+                  name: salary_currency
+                  type: varchar(8)
+              - column:
+                  name: salary_gross
+                  type: boolean
+              - column:
+                  name: location
+                  type: varchar(300)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: work_format
+                  type: varchar(120)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: experience
+                  type: varchar(120)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: published_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: text
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: has_questionnaire
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: NEW
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ban_scope
+                  type: varchar(16)
+              - column:
+                  name: queued_for_application
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: first_seen_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_seen_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: vacancy
+            baseColumnNames: resume_id
+            referencedTableName: hh_resume
+            referencedColumnNames: id
+            constraintName: fk_vacancy_resume
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            tableName: vacancy
+            columnNames: resume_id, hh_vacancy_id
+            constraintName: uq_vacancy_resume_hh_vacancy
+        - createIndex:
+            tableName: vacancy
+            indexName: idx_vacancy_resume_status
+            columns:
+              - column:
+                  name: resume_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: vacancy
+            indexName: idx_vacancy_employer_id
+            columns:
+              - column:
+                  name: employer_id
+              - column:
+                  name: resume_id
+        - sql:
+            sql: >-
+              create index idx_vacancy_application_queue
+              on vacancy (resume_id)
+              where queued_for_application
+        - sql:
+            sql: >-
+              alter table vacancy
+              add constraint chk_vacancy_status
+              check (status in ('NEW', 'USER_SKIPPED', 'COMPANY_BANNED', 'ALREADY_APPLIED', 'CLOSED'))
+        - sql:
+            sql: >-
+              alter table vacancy
+              add constraint chk_vacancy_ban_scope
+              check (
+                (status = 'COMPANY_BANNED' and ban_scope in ('RESUME', 'GLOBAL'))
+                or (status <> 'COMPANY_BANNED' and ban_scope is null)
+              )
+        - sql:
+            sql: >-
+              alter table vacancy
+              add constraint chk_vacancy_queue_allowed_status
+              check (queued_for_application = false or status in ('NEW', 'USER_SKIPPED'))
+        - sql:
+            sql: >-
+              alter table vacancy
+              add constraint chk_vacancy_salary
+              check (
+                (
+                  salary_currency is null
+                  and salary_from is null
+                  and salary_to is null
+                  and salary_gross is null
+                )
+                or (
+                  salary_currency in ('RUR', 'USD', 'EUR')
+                  and salary_gross is not null
+                  and (salary_from is null or salary_from >= 0)
+                  and (salary_to is null or salary_to >= 0)
+                )
+              )
+
+        - createTable:
+            tableName: vacancy_skill
+            columns:
+              - column:
+                  name: vacancy_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: position
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(200)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: vacancy_skill
+            columnNames: vacancy_id, position
+            constraintName: pk_vacancy_skill
+        - addForeignKeyConstraint:
+            baseTableName: vacancy_skill
+            baseColumnNames: vacancy_id
+            referencedTableName: vacancy
+            referencedColumnNames: id
+            constraintName: fk_vacancy_skill_vacancy
+            onDelete: CASCADE
+        - sql:
+            sql: >-
+              alter table vacancy_skill
+              add constraint chk_vacancy_skill_position
+              check (position >= 0)
+
+        - createTable:
+            tableName: vacancy_search_link
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: vacancy_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: search_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: position
+                  type: integer
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: vacancy_search_link
+            baseColumnNames: vacancy_id
+            referencedTableName: vacancy
+            referencedColumnNames: id
+            constraintName: fk_vacancy_search_link_vacancy
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: vacancy_search_link
+            baseColumnNames: search_id
+            referencedTableName: vacancy_search
+            referencedColumnNames: id
+            constraintName: fk_vacancy_search_link_search
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: vacancy_search_link
+            columnNames: vacancy_id, search_id
+            constraintName: uq_vacancy_search_link_vacancy_search
+        - createIndex:
+            tableName: vacancy_search_link
+            indexName: idx_vacancy_search_link_search
+            columns:
+              - column:
+                  name: search_id
+              - column:
+                  name: position
+        - createIndex:
+            tableName: vacancy_search_link
+            indexName: idx_vacancy_search_link_vacancy
+            columns:
+              - column:
+                  name: vacancy_id
+              - column:
+                  name: created_at
+        - sql:
+            sql: >-
+              alter table vacancy_search_link
+              add constraint chk_vacancy_search_link_position
+              check (position >= 0)
+
+        - createTable:
+            tableName: company_ban
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: employer_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: employer_url
+                  type: varchar(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: company_name
+                  type: varchar(300)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scope
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resume_id
+                  type: uuid
+              - column:
+                  name: source_vacancy_id
+                  type: uuid
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: company_ban
+            baseColumnNames: resume_id
+            referencedTableName: hh_resume
+            referencedColumnNames: id
+            constraintName: fk_company_ban_resume
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: company_ban
+            baseColumnNames: source_vacancy_id
+            referencedTableName: vacancy
+            referencedColumnNames: id
+            constraintName: fk_company_ban_source_vacancy
+            onDelete: SET NULL
+        - createIndex:
+            tableName: company_ban
+            indexName: idx_company_ban_employer_id
+            columns:
+              - column:
+                  name: employer_id
+        - createIndex:
+            tableName: company_ban
+            indexName: idx_company_ban_resume_id
+            columns:
+              - column:
+                  name: resume_id
+        - sql:
+            sql: >-
+              alter table company_ban
+              add constraint chk_company_ban_scope
+              check (
+                (scope = 'RESUME' and resume_id is not null)
+                or (scope = 'GLOBAL' and resume_id is null)
+              )
+        - sql:
+            sql: >-
+              create unique index uq_company_ban_global_employer
+              on company_ban (employer_id)
+              where scope = 'GLOBAL'
+        - sql:
+            sql: >-
+              create unique index uq_company_ban_resume_employer
+              on company_ban (employer_id, resume_id)
+              where scope = 'RESUME'

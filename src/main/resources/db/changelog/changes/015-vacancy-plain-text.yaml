@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-vacancy-plain-text
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table vacancy add column plain_text text;
+              alter table vacancy add column text_loaded_at timestamptz;

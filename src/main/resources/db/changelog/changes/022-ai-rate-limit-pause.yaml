@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-ai-rate-limit-pause
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table application_run add column ai_limit_resets_at timestamp with time zone;
+              alter table application_run add column ai_fallback_confirmed boolean not null default false;
+              alter table application_run add column generation_attempt integer not null default 0;

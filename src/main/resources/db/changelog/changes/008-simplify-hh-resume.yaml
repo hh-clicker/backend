@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-simplify-hh-resume
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table hh_resume drop constraint chk_hh_resume_sync_status;
+              alter table hh_resume drop column professional_role;
+              alter table hh_resume drop column area;
+              alter table hh_resume drop column sync_status;
+              alter table hh_resume drop column synced_at;

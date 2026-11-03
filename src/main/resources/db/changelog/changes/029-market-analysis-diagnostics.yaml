@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-market-analysis-diagnostics
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table market_analysis_run
+                add column diagnostics_json jsonb not null default '[]'::jsonb;

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-fix-vacancy-ban-scope-constraint
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table vacancy drop constraint chk_vacancy_ban_scope;
+              alter table vacancy
+                add constraint chk_vacancy_ban_scope
+                check (
+                  (
+                    status = 'COMPANY_BANNED'
+                    and ban_scope is not null
+                    and ban_scope in ('RESUME', 'GLOBAL')
+                  )
+                  or (status <> 'COMPANY_BANNED' and ban_scope is null)
+                );

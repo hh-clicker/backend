@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 030-market-analysis-estimate-epoch
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table market_analysis_run
+                add column estimate_started_at timestamptz,
+                add column estimate_start_position integer not null default 0;

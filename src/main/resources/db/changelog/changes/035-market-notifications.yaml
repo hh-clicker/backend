@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 035-market-notifications
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table notification_settings
+                add column notify_market_completed boolean not null default true;
+              create table telegram_market_message (
+                run_id uuid not null references market_analysis_run(id) on delete cascade,
+                bot_id bigint not null,
+                chat_id bigint not null,
+                message_id bigint not null,
+                fingerprint varchar(200) not null,
+                created_at timestamptz not null default now(),
+                updated_at timestamptz not null default now(),
+                primary key (run_id, bot_id, chat_id),
+                unique (bot_id, chat_id, message_id)
+              );

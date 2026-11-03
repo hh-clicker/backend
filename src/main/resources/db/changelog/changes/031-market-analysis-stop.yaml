@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 031-market-analysis-stop
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table market_analysis_run drop constraint market_analysis_run_status_check;
+              alter table market_analysis_run add constraint market_analysis_run_status_check
+                check (status in ('RUNNING', 'STOPPING', 'PAUSED', 'COMPLETED', 'FAILED'));
+              drop index market_analysis_one_active_per_resume;
+              create unique index market_analysis_one_active_per_resume on market_analysis_run (resume_id)
+                where status in ('RUNNING', 'STOPPING', 'PAUSED');

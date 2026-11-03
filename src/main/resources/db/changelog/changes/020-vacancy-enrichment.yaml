@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-vacancy-enrichment
+      author: hh-clicker
+      changes:
+        - addColumn:
+            tableName: vacancy
+            columns:
+              - column:
+                  name: enrichment
+                  type: jsonb
+

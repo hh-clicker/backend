@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 034-application-dry-run
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table application_run add column mode varchar(16) not null default 'APPLY'
+                check (mode in ('APPLY', 'DRY_RUN'));

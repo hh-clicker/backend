@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 032-market-analysis-search
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              alter table market_analysis_run add column search_id uuid;
+              alter table market_analysis_run add column search_name text;

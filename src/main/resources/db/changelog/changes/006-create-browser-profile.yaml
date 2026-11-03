@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-browser-profile
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table browser_profile (
+                  id uuid primary key,
+                  account_id uuid not null,
+                  created_at timestamp with time zone not null,
+                  updated_at timestamp with time zone not null,
+                  constraint fk_browser_profile_account foreign key (account_id)
+                      references hh_account (id) on delete cascade,
+                  constraint uq_browser_profile_account unique (account_id)
+              );

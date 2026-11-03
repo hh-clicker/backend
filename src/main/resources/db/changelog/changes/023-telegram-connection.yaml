@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-telegram-connection
+      author: hh-clicker
+      changes:
+        - sql:
+            sql: |
+              create table telegram_connection (
+                id smallint primary key check (id = 1),
+                bot_token varchar(256),
+                bot_id bigint,
+                bot_username varchar(64),
+                chat_id bigint,
+                telegram_user_id bigint,
+                pairing_code varchar(64),
+                pairing_expires_at timestamp with time zone,
+                update_offset bigint not null default 0,
+                last_error varchar(500),
+                updated_at timestamp with time zone not null default now(),
+                constraint telegram_connection_identity check (
+                  (bot_token is null and bot_id is null and bot_username is null)
+                  or (bot_token is not null and bot_id is not null and bot_username is not null)
+                ),
+                constraint telegram_connection_chat check (
+                  (chat_id is null and telegram_user_id is null)
+                  or (chat_id is not null and telegram_user_id is not null)
+                ),
+                constraint telegram_connection_pairing check (
+                  (pairing_code is null and pairing_expires_at is null)
+                  or (pairing_code is not null and pairing_expires_at is not null)
+                ),
+                constraint telegram_connection_single_flow check (chat_id is null or pairing_code is null)
+              );
+              insert into telegram_connection (id) values (1);
