@@ -75,4 +75,61 @@ public class BrowserController {
     public record ResumeTextRequest(@jakarta.validation.constraints.NotNull UUID accountId,
                                     @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "[a-f0-9]{20,100}") String hhResumeId) {
     }
+
+    @PostMapping("/selector-diagnostics")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Проверить селекторы на открытой вкладке без навигации и кликов")
+    public BrowserCommandReceiptResponse diagnoseSelectors(@Valid @RequestBody SelectorDiagnosticsRequest request) {
+        if (request.repairGroup() != null) {
+            if (request.mode() != org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.CURRENT || request.tabId() == null)
+                throw new org.hhclicker.backend.browser.exception.InvalidSelectorDiagnosticRequestException();
+            return new BrowserCommandReceiptResponse(service.repairSelectors(request.accountId(), request.tabId(), request.repairGroup()));
+        }
+        if (request.mode() != null) {
+            if (request.mode() != org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.CURRENT
+                    && request.mode() != org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.FULL)
+                throw new org.hhclicker.backend.browser.exception.InvalidSelectorDiagnosticRequestException();
+            return new BrowserCommandReceiptResponse(request.tabId() == null
+                    ? service.diagnoseSelectors(request.accountId(), request.mode(), request.resumeId())
+                    : service.diagnoseSelectors(request.accountId(), request.mode(), request.resumeId(), request.tabId()));
+        }
+        if (request.pageType() == null || !java.util.Set.of(
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.PROFILE,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.SEARCH,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.VACANCY,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.RESUME).contains(request.pageType()))
+            throw new org.hhclicker.backend.browser.exception.InvalidSelectorDiagnosticRequestException();
+        return new BrowserCommandReceiptResponse(service.diagnoseSelectors(request.accountId(), request.pageType()));
+    }
+
+    public record SelectorDiagnosticsRequest(@jakarta.validation.constraints.NotNull UUID accountId,
+            org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType pageType,
+            org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType mode, UUID resumeId, UUID tabId,
+            @jakarta.validation.constraints.Pattern(regexp = "profile|search|vacancy|resumeText") String repairGroup) {
+        public SelectorDiagnosticsRequest(UUID accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType pageType,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType mode, UUID resumeId, UUID tabId) {
+            this(accountId, pageType, mode, resumeId, tabId, null);
+        }
+        public SelectorDiagnosticsRequest(UUID accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType pageType,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType mode, UUID resumeId) {
+            this(accountId, pageType, mode, resumeId, null);
+        }
+    }
+
+    @PostMapping("/focus-diagnostic")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public BrowserCommandReceiptResponse focusDiagnostic(@Valid @RequestBody FocusDiagnosticRequest request) {
+        return new BrowserCommandReceiptResponse(service.focusDiagnostic(request.accountId(), request.tabId()));
+    }
+    public record FocusDiagnosticRequest(@jakarta.validation.constraints.NotNull UUID accountId,
+            @jakarta.validation.constraints.NotNull UUID tabId) {}
+
+    @PostMapping("/focus-vacancy")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public BrowserCommandReceiptResponse focusVacancy(@Valid @RequestBody FocusVacancyRequest request) {
+        return new BrowserCommandReceiptResponse(service.focusVacancy(request.accountId(), request.hhVacancyId()));
+    }
+
+    public record FocusVacancyRequest(@jakarta.validation.constraints.NotNull UUID accountId,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "[0-9]{1,20}") String hhVacancyId) {}
 }

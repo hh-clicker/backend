@@ -34,9 +34,13 @@ class BrowserAgentCommandExpiryTests extends BrowserAgentTestSupport {
         switch (type) {
             case OPEN_BROWSER -> service.open(profile);
             case OPEN_URL -> service.openUrl(profile, "https://hh.ru/applicant/resumes");
+            case FOCUS_VACANCY -> service.focusVacancy(profile, "123");
+            case FOCUS_DIAGNOSTIC -> service.focusDiagnostic(profile, UUID.randomUUID());
             case CHECK_AUTHORIZATION -> service.checkAuthorization(profile);
             case CLOSE_BROWSER -> service.close();
             case DISCOVER_RESUMES -> service.discoverResumes(profile);
+            case DIAGNOSE_SELECTORS -> service.diagnoseSelectors(profile,
+                    org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.PROFILE);
             case SCAN_SEARCH -> startScan();
             case INSPECT_APPLICATION -> {
                 questionnaireVacancyIsReady();
@@ -82,11 +86,13 @@ class BrowserAgentCommandExpiryTests extends BrowserAgentTestSupport {
 
     @ParameterizedTest(name = "{0} истекает через {1} с")
     @CsvSource({
-            "OPEN_URL, 30",
+            "OPEN_URL, 100",
+            "FOCUS_VACANCY, 30",
             "CLOSE_BROWSER, 30",
             "OPEN_BROWSER, 60",
             "CHECK_AUTHORIZATION, 60",
             "DISCOVER_RESUMES, 90",
+            "DIAGNOSE_SELECTORS, 720",
             "INSPECT_APPLICATION, 60",
             "APPLY_VACANCY, 480",
             "SCAN_SEARCH, 2400"
@@ -154,6 +160,9 @@ class BrowserAgentCommandExpiryTests extends BrowserAgentTestSupport {
     @Test
     void expiryOfARunningCommandFreesTheAgentForTheNextOne() {
         BrowserAgentCommand first = claim(BrowserAgentCommandType.OPEN_URL);
+        // OPEN_URL may launch Chrome and now has a 100-second running timeout.
+        // Queue the next command later so its own 60-second queue TTL has not elapsed.
+        clock.advanceSeconds(70);
         UUID second = service.openUrl(profile, "https://hh.ru/search/vacancy");
 
         clock.advanceSeconds(30);

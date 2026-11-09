@@ -47,6 +47,13 @@ public class BrowserAgentCommandController {
             @PathVariable UUID commandId,
             @Valid @RequestBody CompleteBrowserAgentCommandRequest request
     ) {
+        if (request.selectorDiagnostics() != null) {
+            return BrowserAgentCommandResponse.from(commandService.complete(commandId, request.agentId(), request.status(),
+                    request.errorMessage(), request.authorization() == null ? null : request.authorization().toModel(),
+                    request.resumes() == null ? null : request.resumes().stream().map(item -> item.toModel()).toList(),
+                    request.vacancies() == null ? null : request.vacancies().stream().map(item -> item.toModel()).toList(),
+                    request.application(), request.applicationBlocker(), request.vacancyPlainText(), request.selectorDiagnostics()));
+        }
         return BrowserAgentCommandResponse.from(commandService.complete(
                 commandId,
                 request.agentId(),
@@ -57,6 +64,12 @@ public class BrowserAgentCommandController {
                 request.vacancies() == null ? null : request.vacancies().stream().map(item -> item.toModel()).toList(),
                 request.application(), request.applicationBlocker(), request.vacancyPlainText()
         ));
+    }
+
+    @GetMapping("/selector-issues")
+    @Operation(summary = "Получить контекст проблем чтения последних команд выбранного аккаунта")
+    public java.util.List<org.hhclicker.backend.agent.model.RuntimeSelectorIssue> selectorIssues(@RequestParam UUID accountId) {
+        return commandService.runtimeSelectorIssues(accountId);
     }
 
     @GetMapping("/{commandId}")

@@ -33,7 +33,8 @@ public record BrowserAgentCommandResponse(
         String errorMessage,
         BrowserAuthorizationResult authorization,
         List<BrowserResumeSummary> resumes,
-        org.hhclicker.backend.application.model.ApplicationModels.Outcome application
+        org.hhclicker.backend.application.model.ApplicationModels.Outcome application,
+        org.hhclicker.backend.browser.model.SelectorDiagnosticReport selectorDiagnostics
 ) {
     public static BrowserAgentCommandResponse from(BrowserAgentCommand command) {
         return new BrowserAgentCommandResponse(
@@ -48,7 +49,8 @@ public record BrowserAgentCommandResponse(
                 command.errorMessage(),
                 command.authorization(),
                 command.resumes(),
-                command.application()
+                command.application(),
+                command.selectorDiagnostics()
         );
     }
 }

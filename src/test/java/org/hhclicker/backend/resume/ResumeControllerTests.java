@@ -81,6 +81,28 @@ class ResumeControllerTests {
     }
 
     @Test
+    void textRefreshUsesTheExistingResumeEndpointAndReturnsItsProfile() throws Exception {
+        var result = profile();
+        when(resumeService.updateText(resumeId, "Updated text")).thenReturn(result);
+        mockMvc.perform(put("/api/v1/resumes/{id}/text", resumeId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"plainText\":\"Updated text\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(resumeId.toString()))
+                .andExpect(jsonPath("$.textLoadedAt").exists());
+        verify(resumeService).updateText(resumeId, "Updated text");
+        verify(resumeService, never()).updateSettings(any(), any());
+    }
+
+    @Test
+    void textRefreshRejectsMissingEmptyAndOversizedBodiesBeforeCallingService() throws Exception {
+        for (String body : List.of("{}", "{\"plainText\":\"  \"}", "{\"plainText\":\"" + "x".repeat(100001) + "\"}")) {
+            mockMvc.perform(put("/api/v1/resumes/{id}/text", resumeId).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(resumeService);
+    }
+
+    @Test
     void listWithAccountIdPassesTheFilterToTheService() throws Exception {
         when(resumeService.findAll(accountId)).thenReturn(List.of());
 

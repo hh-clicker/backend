@@ -34,6 +34,56 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class BrowserControllerTests {
 
+    @Test
+    void selectorRepairRequiresExplicitCurrentTabAndKnownReadGroup() throws Exception {
+        var tabId = UUID.randomUUID();
+        when(service.repairSelectors(accountId, tabId, "profile")).thenReturn(commandId);
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"mode\":\"CURRENT\",\"tabId\":\"%s\",\"repairGroup\":\"profile\"}".formatted(accountId, tabId)))
+                .andExpect(status().isAccepted());
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"mode\":\"FULL\",\"tabId\":\"%s\",\"repairGroup\":\"profile\"}".formatted(accountId, tabId)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"mode\":\"CURRENT\",\"tabId\":\"%s\",\"repairGroup\":\"letterForm\"}".formatted(accountId, tabId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void currentDiagnosticModeDoesNotRequireAManuallySelectedPageType() throws Exception {
+        when(service.diagnoseSelectors(accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.CURRENT, null))
+                .thenReturn(commandId);
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"mode\":\"CURRENT\"}".formatted(accountId)))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("$.commandId").value(commandId.toString()));
+    }
+
+    @Test
+    void invalidDiagnosticModeIsRejectedBeforeCallingTheService() throws Exception {
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"mode\":\"PROFILE\"}".formatted(accountId)))
+                .andExpect(status().isBadRequest());
+        verify(service, never()).diagnoseSelectors(any(), any(), any());
+    }
+
+    @Test
+    void selectorDiagnosticsQueuesAReadOnlyCommandForTheSelectedAccount() throws Exception {
+        when(service.diagnoseSelectors(accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.PROFILE))
+                .thenReturn(commandId);
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"pageType\":\"PROFILE\"}".formatted(accountId)))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.commandId").value(commandId.toString()));
+    }
+
+    @Test
+    void selectorDiagnosticsRequiresKnownPageType() throws Exception {
+        mockMvc.perform(post("/api/v1/browser/selector-diagnostics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountId\":\"%s\",\"pageType\":\"ASSESSMENT\"}".formatted(accountId)))
+                .andExpect(status().isBadRequest());
+        verify(service, never()).diagnoseSelectors(any(), any());
+    }
+
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T08:00:00Z");
     private static final String HH_RESUME_ID = "abcdef0123456789abcd";
 

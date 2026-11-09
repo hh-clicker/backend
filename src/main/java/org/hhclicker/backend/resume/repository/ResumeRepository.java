@@ -153,6 +153,16 @@ public class ResumeRepository {
                 .update() == 1;
     }
 
+    public boolean updateText(UUID resumeId, String plainText, java.time.Instant loadedAt) {
+        // Do not write a previously read settings snapshot: settings may be saved concurrently.
+        return jdbcClient.sql("""
+                update hh_resume set plain_text = :plainText, text_loaded_at = :loadedAt, updated_at = :loadedAt
+                where id = :id
+                """)
+                .param("id", resumeId).param("plainText", plainText)
+                .param("loadedAt", toOffsetDateTime(loadedAt)).update() == 1;
+    }
+
     public boolean deleteById(UUID id) {
         return jdbcClient.sql("delete from hh_resume where id = :id")
                 .param("id", id)

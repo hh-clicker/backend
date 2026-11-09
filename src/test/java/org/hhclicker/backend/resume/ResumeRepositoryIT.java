@@ -85,6 +85,25 @@ class ResumeRepositoryIT extends PostgresIntegrationTest {
     }
 
     @Test
+    void updatingTextKeepsIdentitySettingsAndCreationDate() {
+        var id = UUID.randomUUID();
+        var settings = new ResumeAutomationSettings("Сохранённое письмо", 42, 20, 60, false, AiLetterSettings.defaults());
+        repository.insertIfAbsent(resume(id, accountId, HASH, "Разработчик", settings, CREATED_AT, PLAIN_TEXT, TEXT_LOADED_AT));
+        var loadedAt = TEXT_LOADED_AT.plusSeconds(300);
+        assertTrue(repository.updateText(id, "Актуальный текст", loadedAt));
+        var updated = repository.findById(id).orElseThrow();
+        assertEquals("Актуальный текст", updated.plainText());
+        assertEquals(loadedAt, updated.textLoadedAt());
+        assertEquals(loadedAt, updated.updatedAt());
+        assertEquals(CREATED_AT, updated.createdAt());
+        assertEquals(accountId, updated.accountId());
+        assertEquals(HASH, updated.hhResumeId());
+        assertEquals("Разработчик", updated.name());
+        assertEquals(settings, updated.settings());
+        assertFalse(repository.updateText(UUID.randomUUID(), "Текст", loadedAt));
+    }
+
+    @Test
     void insertLeavesGenerationColumnsAtDatabaseDefaultsAndReadsThemBackAsDefaults() {
         UUID id = UUID.randomUUID();
         repository.insertIfAbsent(defaultResume(id, HASH));

@@ -68,6 +68,13 @@ public class ResumeController {
         )));
     }
 
+    @PutMapping("/{resumeId}/text")
+    @Operation(summary = "Обновить сохранённый текст резюме после чтения с HH")
+    public ResumeProfileResponse updateText(@PathVariable UUID resumeId,
+            @Valid @RequestBody org.hhclicker.backend.resume.dto.UpdateResumeTextRequest request) {
+        return ResumeProfileResponse.from(resumeService.updateText(resumeId, request.plainText()));
+    }
+
     @DeleteMapping("/{resumeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Удалить резюме")

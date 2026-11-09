@@ -24,6 +24,7 @@ public record CompleteBrowserAgentCommandRequest(
         @Size(max = 2000) List<@NotNull @Valid BrowserSearchVacancyRequest> vacancies,
         org.hhclicker.backend.application.model.ApplicationModels.Outcome application,
         org.hhclicker.backend.application.model.ApplicationModels.QueueBlocker applicationBlocker,
-        @Size(max = 100000) String vacancyPlainText
+        @Size(max = 100000) String vacancyPlainText,
+        @Valid org.hhclicker.backend.browser.model.SelectorDiagnosticReport selectorDiagnostics
 ) {
 }

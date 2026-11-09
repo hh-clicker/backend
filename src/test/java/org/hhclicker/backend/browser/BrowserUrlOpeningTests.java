@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Открытие адреса в запущенном профиле: предусловия и проверка ссылки на hh.ru.
+ * Открытие адреса с автоматическим запуском профиля: предусловия и проверка ссылки на hh.ru.
  */
 class BrowserUrlOpeningTests extends BrowserServiceTestSupport {
 
@@ -49,41 +49,41 @@ class BrowserUrlOpeningTests extends BrowserServiceTestSupport {
     }
 
     @Test
-    void closedBrowserIsReportedAsNotRunning() {
+    void closedBrowserCanBeOpenedByTheUrlCommand() {
         profileExists();
         runtimeReports("READY", false, profileId);
 
-        assertBrowserNotRunning(() -> service.openUrl(accountId, "https://hh.ru/applicant/resumes"));
-
-        verify(runtime, never()).openUrl(any(), anyString());
+        service.openUrl(accountId, "https://hh.ru/applicant/resumes");
+        verify(runtime).openUrl(profile, "https://hh.ru/applicant/resumes");
     }
 
     @Test
-    void browserOfAnotherProfileIsReportedAsNotRunning() {
+    void freeBrowserOfAnotherProfileCanBeSwitchedByTheGateway() {
         profileExists();
         runtimeReports("READY", true, otherProfileId);
 
-        assertBrowserNotRunning(() -> service.openUrl(accountId, "https://hh.ru/applicant/resumes"));
+        service.openUrl(accountId, "https://hh.ru/applicant/resumes");
+        verify(runtime).openUrl(profile, "https://hh.ru/applicant/resumes");
     }
 
     @Test
-    void openBrowserWithoutAnActiveProfileIsReportedAsNotRunning() {
+    void missingActiveProfileDoesNotPreventAutomaticOpening() {
         profileExists();
         runtimeReports("READY", true, null);
 
-        assertBrowserNotRunning(() -> service.openUrl(accountId, "https://hh.ru/applicant/resumes"));
+        service.openUrl(accountId, "https://hh.ru/applicant/resumes");
+        verify(runtime).openUrl(profile, "https://hh.ru/applicant/resumes");
     }
 
     /**
-     * Фиксирует порядок проверок: ссылка разбирается последней, поэтому при закрытом браузере
-     * пользователь узнает о браузере, а не о неверной ссылке.
+     * Закрытый браузер можно запустить, но неверный URL до агента дойти не должен.
      */
     @Test
     void linkIsValidatedOnlyAfterEveryRuntimePreconditionPassed() {
         profileExists();
         runtimeReports("READY", false, null);
 
-        assertBrowserNotRunning(() -> service.openUrl(accountId, "ftp://example.com"));
+        assertInvalidUrl(() -> service.openUrl(accountId, "ftp://example.com"));
 
         noProfileExists();
         runtimeReports("READY", true, profileId);

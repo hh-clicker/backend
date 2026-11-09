@@ -49,6 +49,26 @@ class BrowserAgentResultRoutingTests extends BrowserAgentTestSupport {
         return service.claimNext(AGENT_ID).orElseThrow();
     }
 
+    @Test
+    void optionalSearchWarningDoesNotFailOrDiscardTheSuccessfulScan() {
+        var command = claimedScan(1);
+        var report = new org.hhclicker.backend.browser.model.SelectorDiagnosticReport(
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType.SEARCH, START,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.Status.CHECKED,
+                "Дополнительное поле не прочитано", List.of(new org.hhclicker.backend.browser.model.SelectorDiagnosticReport.Row(
+                "search", "experience", "Опыт", "css=.experience", org.hhclicker.backend.browser.model.SelectorDiagnosticReport.Source.BUNDLED,
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.Result.FAIL, false, 0, 0, "Есть признаки данных")),
+                org.hhclicker.backend.browser.model.SelectorDiagnosticReport.Summary.FAILED, null, null, null, null, List.of(), null);
+        var vacancies = List.of(vacancy("123"));
+        var result = service.complete(command.id(), AGENT_ID, BrowserAgentCommandResultStatus.SUCCEEDED,
+                null, authorized(), null, vacancies, null, null, null, report);
+        assertEquals(BrowserAgentCommandStatus.SUCCEEDED, result.status());
+        verify(searches).completeScan(searchId, vacancies);
+        verify(searches, never()).failScan(any(), any());
+        assertEquals(searchId, service.runtimeSelectorIssues(accountId).getFirst().searchId());
+        assertNull(service.runtimeSelectorIssues(accountId).getFirst().applicationId());
+    }
+
     private BrowserAgentCommand claimedApply() {
         when(applications.claim(profileId)).thenReturn(Optional.of(task()));
         return service.claimNext(AGENT_ID).orElseThrow();
@@ -381,7 +401,7 @@ class BrowserAgentResultRoutingTests extends BrowserAgentTestSupport {
     }
 
     @Test
-    void browserStateIsUpdatedOnlyByTheBrowserLifecycleCommands() {
+    void browserStateIsUpdatedByLifecycleAndUrlCommandsThatCanOpenChrome() {
         BrowserAgentCommand opened = claimedOpenBrowser();
         service.complete(opened.id(), AGENT_ID, BrowserAgentCommandResultStatus.SUCCEEDED, null,
                 authorized(), null, null, null, null, null);
@@ -397,7 +417,8 @@ class BrowserAgentResultRoutingTests extends BrowserAgentTestSupport {
         BrowserAgentCommand url = service.claimNext(AGENT_ID).orElseThrow();
         service.complete(url.id(), AGENT_ID, BrowserAgentCommandResultStatus.SUCCEEDED, null,
                 null, null, null, null, null, null);
-        verify(statusService, times(2)).updateBrowserState(anyBoolean(), any());
+        verify(statusService, times(2)).updateBrowserState(true, profileId);
+        verify(statusService, times(3)).updateBrowserState(anyBoolean(), any());
     }
 
     @Test

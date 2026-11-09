@@ -109,6 +109,14 @@ public class ResumeService {
         }
     }
 
+    @Transactional
+    public ResumeProfile updateText(UUID resumeId, String plainText) {
+        findResume(resumeId);
+        String text = normalizeRequired(plainText, 100000, "Не загружен текст резюме. Повторите обновление через браузер HH.");
+        if (!resumeRepository.updateText(resumeId, text, clock.instant())) throw new ResumeNotFoundException(resumeId);
+        return toProfile(findResume(resumeId));
+    }
+
     private HhResume findResume(UUID resumeId) {
         return resumeRepository.findById(resumeId)
                 .orElseThrow(() -> new ResumeNotFoundException(resumeId));

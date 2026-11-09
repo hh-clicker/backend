@@ -10,8 +10,19 @@ public record BrowserAgentCommandPayload(
         UUID searchId,
         Integer pagesLimit,
         org.hhclicker.backend.application.model.ApplicationModels.Task application,
-        UUID vacancyId
+        UUID vacancyId,
+        org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType diagnosticPageType,
+        org.hhclicker.backend.browser.model.SelectorDiagnosticTarget diagnosticTarget
 ) {
+    public BrowserAgentCommandPayload(UUID profileId, String url, UUID searchId, Integer pagesLimit,
+            org.hhclicker.backend.application.model.ApplicationModels.Task application, UUID vacancyId,
+            org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType diagnosticPageType) {
+        this(profileId, url, searchId, pagesLimit, application, vacancyId, diagnosticPageType, null);
+    }
+    public BrowserAgentCommandPayload(UUID profileId, String url, UUID searchId, Integer pagesLimit,
+                                      org.hhclicker.backend.application.model.ApplicationModels.Task application, UUID vacancyId) {
+        this(profileId, url, searchId, pagesLimit, application, vacancyId, null);
+    }
     public BrowserAgentCommandPayload(UUID profileId, String url, UUID searchId, Integer pagesLimit,
                                       org.hhclicker.backend.application.model.ApplicationModels.Task application) {
         this(profileId, url, searchId, pagesLimit, application, null);

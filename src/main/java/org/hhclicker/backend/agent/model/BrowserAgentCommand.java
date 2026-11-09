@@ -19,8 +19,15 @@ public record BrowserAgentCommand(
         String errorMessage,
         BrowserAuthorizationResult authorization,
         List<BrowserResumeSummary> resumes,
-        org.hhclicker.backend.application.model.ApplicationModels.Outcome application
+        org.hhclicker.backend.application.model.ApplicationModels.Outcome application,
+        org.hhclicker.backend.browser.model.SelectorDiagnosticReport selectorDiagnostics
 ) {
+    public BrowserAgentCommand(UUID id, BrowserAgentCommandType type, BrowserAgentCommandPayload payload,
+                               BrowserAgentCommandStatus status, String agentId, Instant createdAt, Instant startedAt,
+                               Instant completedAt, String errorMessage, BrowserAuthorizationResult authorization,
+                               List<BrowserResumeSummary> resumes, org.hhclicker.backend.application.model.ApplicationModels.Outcome application) {
+        this(id, type, payload, status, agentId, createdAt, startedAt, completedAt, errorMessage, authorization, resumes, application, null);
+    }
     public BrowserAgentCommand(UUID id, BrowserAgentCommandType type, BrowserAgentCommandPayload payload,
                                BrowserAgentCommandStatus status, String agentId, Instant createdAt, Instant startedAt,
                                Instant completedAt, String errorMessage, BrowserAuthorizationResult authorization,

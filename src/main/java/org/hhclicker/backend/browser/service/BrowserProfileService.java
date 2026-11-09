@@ -69,11 +69,12 @@ public class BrowserProfileService {
         requireRuntimeAvailable();
         BrowserProfile profile = repository.findByAccountId(accountId)
                 .orElseThrow(() -> new BrowserProfileNotFoundException(accountId));
-        BrowserRuntimeSnapshot runtime = runtimeGateway.getSnapshot();
-        if (!runtime.browserOpen() || !profile.id().equals(runtime.activeProfileId())) {
-            throw new BrowserNotRunningException();
-        }
         return runtimeGateway.openUrl(profile, normalizeHhUrl(sourceUrl));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public UUID focusVacancy(UUID accountId, String hhVacancyId) {
+        return runtimeGateway.focusVacancy(requireRunningProfile(accountId), hhVacancyId);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -84,6 +85,27 @@ public class BrowserProfileService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UUID discoverResumes(UUID accountId) {
         return runtimeGateway.discoverResumes(requireRunningProfile(accountId));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public UUID diagnoseSelectors(UUID accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType pageType) {
+        return runtimeGateway.diagnoseSelectors(requireRunningProfile(accountId), pageType);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public UUID diagnoseSelectors(UUID accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType mode, UUID resumeId) {
+        return runtimeGateway.diagnoseSelectors(requireRunningProfile(accountId), mode, resumeId);
+    }
+    public UUID diagnoseSelectors(UUID accountId, org.hhclicker.backend.browser.model.SelectorDiagnosticReport.PageType mode, UUID resumeId, UUID tabId) {
+        return runtimeGateway.diagnoseSelectors(requireRunningProfile(accountId), mode, resumeId, tabId);
+    }
+    public UUID repairSelectors(UUID accountId, UUID tabId, String group) {
+        return runtimeGateway.repairSelectors(requireRunningProfile(accountId), tabId, group);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public UUID focusDiagnostic(UUID accountId, UUID tabId) {
+        return runtimeGateway.focusDiagnostic(requireRunningProfile(accountId), tabId);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

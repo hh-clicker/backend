@@ -52,9 +52,10 @@ abstract class BrowserAgentTestSupport {
     protected final ApplicationService applications = mock(ApplicationService.class);
     protected final VacancySelectionService vacancySelection = mock(VacancySelectionService.class);
 
+    protected final org.hhclicker.backend.resume.service.ResumeService diagnosticResumes = mock(org.hhclicker.backend.resume.service.ResumeService.class);
     protected final BrowserAgentCommandService service = new BrowserAgentCommandService(
             clock, COMMAND_TIMEOUT, statusService, authorizationService, searches, profiles, applications,
-            vacancySelection);
+            vacancySelection, diagnosticResumes);
 
     protected final UUID profileId = UUID.randomUUID();
     protected final UUID otherProfileId = UUID.randomUUID();

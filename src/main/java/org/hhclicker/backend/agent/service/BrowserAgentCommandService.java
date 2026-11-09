@@ -14,6 +14,9 @@ import org.hhclicker.backend.application.service.ApplicationService;
 import org.hhclicker.backend.browser.model.BrowserAuthorizationResult;
 import org.hhclicker.backend.browser.model.BrowserProfile;
 import org.hhclicker.backend.browser.model.BrowserResumeSummary;
+import org.hhclicker.backend.browser.model.SelectorDiagnosticReport;
+import org.hhclicker.backend.browser.model.SelectorDiagnosticTarget;
+import org.hhclicker.backend.resume.service.ResumeService;
 import org.hhclicker.backend.browser.service.BrowserAuthorizationService;
 import org.hhclicker.backend.browser.service.BrowserProfileLookup;
 import org.hhclicker.backend.browser.service.BrowserRuntimeGateway;
@@ -45,6 +48,7 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
     private final BrowserProfileLookup profiles;
     private final ApplicationService applications;
     private final VacancySelectionService vacancySelection;
+    private final ResumeService resumes;
     private final Map<UUID, BrowserAgentCommand> commands = new LinkedHashMap<>();
     private final Deque<UUID> queue = new ArrayDeque<>();
     // Access only under this monitor. Persisting scans remain IN_PROGRESS until commit/publication.
@@ -58,7 +62,8 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
             SearchService searches,
             BrowserProfileLookup profiles,
             ApplicationService applications,
-            VacancySelectionService vacancySelection
+            VacancySelectionService vacancySelection,
+            ResumeService resumes
     ) {
         this.clock = clock;
         this.commandTimeout = commandTimeout;
@@ -68,6 +73,7 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         this.profiles = profiles;
         this.applications = applications;
         this.vacancySelection = vacancySelection;
+        this.resumes = resumes;
     }
 
     @Override
@@ -88,7 +94,24 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
 
     @Override
     public synchronized UUID openUrl(BrowserProfile profile, String url) {
+        expireStaleCommands();
+        var runtime = getSnapshot();
+        if ((!runtime.browserOpen() || !profile.id().equals(runtime.activeProfileId()))
+                && (!"READY".equals(runtime.agentStatus()) || commands.values().stream().anyMatch(c ->
+                    c.status() == BrowserAgentCommandStatus.IN_PROGRESS || c.status() == BrowserAgentCommandStatus.QUEUED)))
+            throw new BrowserAgentCommandConflictException("Дождитесь завершения текущей операции перед открытием другого профиля браузера.");
         return enqueue(BrowserAgentCommandType.OPEN_URL, BrowserAgentCommandPayload.forUrl(profile, url)).id();
+    }
+
+    @Override
+    public synchronized UUID focusVacancy(BrowserProfile profile, String hhVacancyId) {
+        if (hhVacancyId == null || !hhVacancyId.matches("[0-9]{1,20}"))
+            throw new InvalidBrowserAgentDataException("Некорректный ID вакансии.");
+        var runtime = getSnapshot();
+        if (!runtime.browserOpen() || !profile.id().equals(runtime.activeProfileId()))
+            throw new BrowserAgentCommandConflictException("Браузер нужного аккаунта закрыт. Скопируйте ссылку или откройте браузер вручную.");
+        return enqueue(BrowserAgentCommandType.FOCUS_VACANCY,
+                BrowserAgentCommandPayload.forUrl(profile, "https://hh.ru/vacancy/" + hhVacancyId)).id();
     }
 
     @Override
@@ -144,6 +167,67 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
     }
 
     @Override
+    public synchronized UUID diagnoseSelectors(BrowserProfile profile, SelectorDiagnosticReport.PageType pageType) {
+        return diagnoseSelectors(profile, pageType, null);
+    }
+
+    @Override
+    public synchronized UUID diagnoseSelectors(BrowserProfile profile, SelectorDiagnosticReport.PageType pageType, UUID resumeId) {
+        return diagnoseSelectors(profile, pageType, resumeId, null);
+    }
+
+    @Override
+    public synchronized UUID diagnoseSelectors(BrowserProfile profile, SelectorDiagnosticReport.PageType pageType, UUID resumeId, UUID tabId) {
+        return diagnoseSelectors(profile, pageType, resumeId, tabId, null);
+    }
+
+    @Override
+    public synchronized UUID repairSelectors(BrowserProfile profile, UUID tabId, String group) {
+        if (tabId == null || group == null || !Set.of("profile", "search", "vacancy", "resumeText").contains(group))
+            throw new InvalidBrowserAgentDataException("Не указана вкладка или группа селекторов чтения.");
+        return diagnoseSelectors(profile, SelectorDiagnosticReport.PageType.CURRENT, null, tabId, group);
+    }
+
+    private UUID diagnoseSelectors(BrowserProfile profile, SelectorDiagnosticReport.PageType pageType, UUID resumeId, UUID tabId, String repairGroup) {
+        expireStaleCommands();
+        if (pageType == null) throw new InvalidBrowserAgentDataException("Не указан тип страницы.");
+        if (tabId != null && pageType != SelectorDiagnosticReport.PageType.CURRENT)
+            throw new InvalidBrowserAgentDataException("Выбор вкладки доступен только для проверки открытой страницы.");
+        if (!"READY".equals(getSnapshot().agentStatus()))
+            throw new BrowserAgentCommandConflictException("Дождитесь, пока Browser Agent освободится.");
+        if (commands.values().stream().anyMatch(c -> c.status() == BrowserAgentCommandStatus.QUEUED
+                || c.status() == BrowserAgentCommandStatus.IN_PROGRESS))
+            throw new BrowserAgentCommandConflictException("Дождитесь завершения предыдущей команды браузера.");
+        SelectorDiagnosticTarget target = tabId == null ? null : new SelectorDiagnosticTarget(null, null, null, tabId.toString(), repairGroup);
+        if (pageType == SelectorDiagnosticReport.PageType.FULL) {
+            var resume = resumeId == null ? resumes.findAll(profile.accountId()).stream()
+                    .sorted(Comparator.comparing(item -> item.resume().id())).findFirst().orElse(null)
+                    : resumes.findById(resumeId);
+            if (resume != null && !resume.resume().accountId().equals(profile.accountId()))
+                throw new InvalidBrowserAgentDataException("Резюме принадлежит другому HH-аккаунту.");
+            var search = resume == null ? null : searches.findAll(resume.resume().id()).stream()
+                    .sorted(Comparator.comparing((org.hhclicker.backend.search.service.SearchProfile item) -> item.search().createdAt())
+                            .thenComparing(item -> item.search().id())).findFirst().orElse(null);
+            target = new SelectorDiagnosticTarget(resume == null ? null : resume.resume().hhResumeId(),
+                    search == null ? null : search.search().sourceUrl(),
+                    search == null ? null : search.search().name().substring(0, Math.min(120, search.search().name().length())), null);
+        }
+        return enqueue(BrowserAgentCommandType.DIAGNOSE_SELECTORS,
+                new BrowserAgentCommandPayload(profile.id(), null, null, null, null, null, pageType, target)).id();
+    }
+
+    @Override
+    public synchronized UUID focusDiagnostic(BrowserProfile profile, UUID tabId) {
+        if (tabId == null) throw new InvalidBrowserAgentDataException("Не указана вкладка диагностики.");
+        var runtime = getSnapshot();
+        if (!runtime.browserOpen() || !profile.id().equals(runtime.activeProfileId()))
+            throw new BrowserAgentCommandConflictException("Откройте браузер нужного аккаунта.");
+        return enqueue(BrowserAgentCommandType.FOCUS_DIAGNOSTIC,
+                new BrowserAgentCommandPayload(profile.id(), null, null, null, null, null, null,
+                        new SelectorDiagnosticTarget(null, null, null, tabId.toString()))).id();
+    }
+
+    @Override
     public synchronized UUID readResumeText(BrowserProfile profile, String hhResumeId) {
         if (hhResumeId == null || !hhResumeId.matches("[a-f0-9]{20,100}")) {
             throw new InvalidBrowserAgentDataException("Некорректный идентификатор резюме.");
@@ -156,8 +240,10 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         expireStaleCommands();
         boolean inspecting = payload != null && applications.inspectionAllowed(payload.profileId())
                 && (type == BrowserAgentCommandType.OPEN_BROWSER || type == BrowserAgentCommandType.OPEN_URL
-                || type == BrowserAgentCommandType.CHECK_AUTHORIZATION || type == BrowserAgentCommandType.INSPECT_APPLICATION);
-        if (type != BrowserAgentCommandType.APPLY_VACANCY && applications.busy() && !inspecting) {
+                || type == BrowserAgentCommandType.CHECK_AUTHORIZATION || type == BrowserAgentCommandType.INSPECT_APPLICATION
+                || type == BrowserAgentCommandType.DIAGNOSE_SELECTORS);
+        if (type != BrowserAgentCommandType.APPLY_VACANCY && type != BrowserAgentCommandType.FOCUS_VACANCY
+                && type != BrowserAgentCommandType.FOCUS_DIAGNOSTIC && applications.busy() && !inspecting) {
             throw new BrowserAgentCommandConflictException("Завершите или отмените запуск откликов перед управлением браузером. Ручные действия в Chrome доступны.");
         }
         Optional<BrowserAgentCommand> pending = commands.values().stream()
@@ -229,6 +315,13 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         return Optional.of(claimed);
     }
 
+    public BrowserAgentCommand complete(UUID commandId, String agentId, BrowserAgentCommandResultStatus resultStatus,
+            String errorMessage, BrowserAuthorizationResult authorization, List<BrowserResumeSummary> resumes,
+            List<NormalizedVacancy> vacancies, Outcome application, QueueBlocker applicationBlocker, String vacancyPlainText) {
+        return complete(commandId, agentId, resultStatus, errorMessage, authorization, resumes, vacancies,
+                application, applicationBlocker, vacancyPlainText, null);
+    }
+
     public BrowserAgentCommand complete(
             UUID commandId,
             String agentId,
@@ -239,7 +332,8 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
             List<NormalizedVacancy> vacancies,
             Outcome application,
             QueueBlocker applicationBlocker,
-            String vacancyPlainText
+            String vacancyPlainText,
+            SelectorDiagnosticReport selectorDiagnostics
     ) {
         BrowserAgentCommand command;
         synchronized (this) {
@@ -247,7 +341,7 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
             command = getRequired(commandId);
             if (command.type() != BrowserAgentCommandType.SCAN_SEARCH) {
                 return completeResult(command, agentId, resultStatus, errorMessage, authorization,
-                        resumes, vacancies, application, applicationBlocker, vacancyPlainText);
+                        resumes, vacancies, application, applicationBlocker, vacancyPlainText, selectorDiagnostics);
             }
             if (!Objects.equals(command.agentId(), agentId.trim())) {
                 throw new BrowserAgentCommandConflictException("Команда назначена другому Browser Agent.");
@@ -261,7 +355,7 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         try {
             // The database transaction may take time; polling and expiration of other commands stay available.
             return completeResult(command, agentId, resultStatus, errorMessage, authorization,
-                    resumes, vacancies, application, applicationBlocker, vacancyPlainText);
+                    resumes, vacancies, application, applicationBlocker, vacancyPlainText, selectorDiagnostics);
         } finally {
             synchronized (this) {
                 completingScans.remove(commandId);
@@ -272,7 +366,7 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
     private BrowserAgentCommand completeResult(BrowserAgentCommand command, String agentId,
                                                BrowserAgentCommandResultStatus resultStatus, String errorMessage, BrowserAuthorizationResult authorization,
                                                List<BrowserResumeSummary> resumes, List<NormalizedVacancy> vacancies, Outcome application,
-                                               QueueBlocker applicationBlocker, String vacancyPlainText) {
+                                               QueueBlocker applicationBlocker, String vacancyPlainText, SelectorDiagnosticReport selectorDiagnostics) {
 
         // A delivered response can be lost: acknowledging the same result must be idempotent.
         if (Objects.equals(command.agentId(), agentId.trim())
@@ -285,6 +379,62 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         }
         if (!command.agentId().equals(agentId.trim())) {
             throw new BrowserAgentCommandConflictException("Команда назначена другому Browser Agent.");
+        }
+
+        if (command.type() == BrowserAgentCommandType.DIAGNOSE_SELECTORS
+                && resultStatus == BrowserAgentCommandResultStatus.SUCCEEDED) {
+            var requested = command.payload().diagnosticPageType();
+            var repairTarget = command.payload().diagnosticTarget();
+            boolean repairContinuation = requested == SelectorDiagnosticReport.PageType.CURRENT
+                    && repairTarget != null && repairTarget.repairGroup() != null
+                    && selectorDiagnostics != null && selectorDiagnostics.pageType() == SelectorDiagnosticReport.PageType.FULL;
+            if (selectorDiagnostics == null || requested != SelectorDiagnosticReport.PageType.CURRENT && selectorDiagnostics.pageType() != requested
+                    || requested == SelectorDiagnosticReport.PageType.CURRENT && !repairContinuation && (selectorDiagnostics.pageType() == SelectorDiagnosticReport.PageType.FULL
+                        || selectorDiagnostics.pageType() == SelectorDiagnosticReport.PageType.CURRENT))
+                throw new InvalidBrowserAgentDataException("Агент не вернул диагностику выбранного типа страницы.");
+            var steps = selectorDiagnostics.scenarios();
+            if (selectorDiagnostics.status() == SelectorDiagnosticReport.Status.SELECT_TAB) {
+                if (requested != SelectorDiagnosticReport.PageType.CURRENT || command.payload().diagnosticTarget() != null
+                        || selectorDiagnostics.pageType() != SelectorDiagnosticReport.PageType.UNKNOWN
+                        || selectorDiagnostics.tabs() == null || !selectorDiagnostics.rows().isEmpty())
+                    throw new InvalidBrowserAgentDataException("Недопустимый список вкладок диагностики.");
+            } else if (selectorDiagnostics.tabs() != null && !selectorDiagnostics.tabs().isEmpty()) {
+                throw new InvalidBrowserAgentDataException("Список вкладок недопустим для результата проверки.");
+            }
+            if (requested == SelectorDiagnosticReport.PageType.FULL || repairContinuation) {
+                if (steps == null || !steps.stream().map(SelectorDiagnosticReport::pageType).toList().equals(List.of(
+                        SelectorDiagnosticReport.PageType.PROFILE, SelectorDiagnosticReport.PageType.RESUME,
+                        SelectorDiagnosticReport.PageType.SEARCH, SelectorDiagnosticReport.PageType.VACANCY))
+                        || steps.stream().anyMatch(step -> step.scenarios() != null && !step.scenarios().isEmpty()))
+                    throw new InvalidBrowserAgentDataException("Недопустимая структура полной диагностики.");
+                if (repairContinuation) {
+                    var repairedType = switch (repairTarget.repairGroup()) {
+                        case "profile" -> SelectorDiagnosticReport.PageType.PROFILE;
+                        case "resumeText" -> SelectorDiagnosticReport.PageType.RESUME;
+                        case "search" -> SelectorDiagnosticReport.PageType.SEARCH;
+                        case "vacancy" -> SelectorDiagnosticReport.PageType.VACANCY;
+                        default -> throw new InvalidBrowserAgentDataException("Недопустимая группа исправления.");
+                    };
+                    if (steps.stream().noneMatch(step -> step.pageType() == repairedType && repairTarget.tabId().equals(step.tabId())))
+                        throw new InvalidBrowserAgentDataException("Продолжение не содержит исправленную вкладку.");
+                }
+            } else if (steps != null && !steps.isEmpty()) throw new InvalidBrowserAgentDataException("Недопустимые вложенные результаты диагностики.");
+        } else if (selectorDiagnostics != null) {
+            var allowedPages = switch (command.type()) {
+                case OPEN_BROWSER, CHECK_AUTHORIZATION -> Set.of(SelectorDiagnosticReport.PageType.PROFILE);
+                case DISCOVER_RESUMES -> Set.of(SelectorDiagnosticReport.PageType.PROFILE, SelectorDiagnosticReport.PageType.RESUME);
+                case SCAN_SEARCH -> Set.of(SelectorDiagnosticReport.PageType.PROFILE, SelectorDiagnosticReport.PageType.SEARCH);
+                case APPLY_VACANCY, INSPECT_APPLICATION -> Set.of(SelectorDiagnosticReport.PageType.PROFILE, SelectorDiagnosticReport.PageType.VACANCY);
+                default -> Set.<SelectorDiagnosticReport.PageType>of();
+            };
+            if (!allowedPages.contains(selectorDiagnostics.pageType())
+                    || selectorDiagnostics.status() != SelectorDiagnosticReport.Status.CHECKED
+                    || selectorDiagnostics.summary() != SelectorDiagnosticReport.Summary.FAILED
+                    || selectorDiagnostics.rows().stream().noneMatch(row -> row.status() == SelectorDiagnosticReport.Result.FAIL)
+                    || selectorDiagnostics.scenarios() != null && !selectorDiagnostics.scenarios().isEmpty()
+                    || selectorDiagnostics.tabs() != null && !selectorDiagnostics.tabs().isEmpty()
+                    || selectorDiagnostics.repairableGroups() != null && !selectorDiagnostics.repairableGroups().isEmpty())
+                throw new InvalidBrowserAgentDataException("Недопустимый контекст ошибки чтения страницы.");
         }
 
         boolean discovered = command.type() == BrowserAgentCommandType.DISCOVER_RESUMES
@@ -392,12 +542,13 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
                 normalizeErrorMessage(resultStatus, errorMessage),
                 authorization,
                 resumes == null ? null : List.copyOf(resumes),
-                application
+                application,
+                selectorDiagnostics
         );
         synchronized (this) {
             commands.put(completed.id(), completed);
             if (resultStatus == BrowserAgentCommandResultStatus.SUCCEEDED) {
-                if (command.type() == BrowserAgentCommandType.OPEN_BROWSER) {
+                if (command.type() == BrowserAgentCommandType.OPEN_BROWSER || command.type() == BrowserAgentCommandType.OPEN_URL) {
                     statusService.updateBrowserState(true, command.payload().profileId());
                 } else if (command.type() == BrowserAgentCommandType.CLOSE_BROWSER) {
                     statusService.updateBrowserState(false, null);
@@ -406,6 +557,58 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
             pruneHistory();
         }
         return completed;
+    }
+
+    public List<RuntimeSelectorIssue> runtimeSelectorIssues(UUID accountId) {
+        UUID profileId = profiles.forAccount(accountId).id();
+        synchronized (this) {
+            var latest = new LinkedHashMap<String, BrowserAgentCommand>();
+            var resolved = new HashSet<UUID>();
+            for (var command : commands.values()) {
+                var payload = command.payload();
+                if (payload == null || !profileId.equals(payload.profileId())) continue;
+                if (command.type() == BrowserAgentCommandType.DIAGNOSE_SELECTORS) {
+                    if (command.status() == BrowserAgentCommandStatus.SUCCEEDED && command.selectorDiagnostics() != null) {
+                        for (var previous : latest.values()) {
+                            if (previous.selectorDiagnostics() != null && resolvesRuntimeIssue(previous.selectorDiagnostics(), command))
+                                resolved.add(previous.id());
+                        }
+                    }
+                    continue;
+                }
+                String context = command.type() + ":" + (payload.searchId() != null ? payload.searchId()
+                        : payload.application() != null ? payload.application().itemId()
+                        : payload.vacancyId() != null ? payload.vacancyId() : payload.url());
+                latest.put(context, command);
+            }
+            return latest.values().stream().filter(command -> command.completedAt() != null && command.selectorDiagnostics() != null)
+                    .sorted(Comparator.comparing(BrowserAgentCommand::completedAt).reversed())
+                    .map(command -> new RuntimeSelectorIssue(command.id(),
+                            command.payload().searchId(), command.payload().application() == null ? null : command.payload().application().itemId(),
+                            command.completedAt(), command.selectorDiagnostics(), resolved.contains(command.id()), runtimeResumeHash(command))).toList();
+        }
+    }
+
+    private String runtimeResumeHash(BrowserAgentCommand command) {
+        if (command.type() != BrowserAgentCommandType.DISCOVER_RESUMES || command.payload().url() == null) return null;
+        var match = java.util.regex.Pattern.compile("^https://hh\\.ru/resume/([a-f0-9]{20,100})\\?print=true$").matcher(command.payload().url());
+        return match.matches() ? match.group(1) : null;
+    }
+
+    private boolean resolvesRuntimeIssue(SelectorDiagnosticReport issue, BrowserAgentCommand verification) {
+        var target = verification.payload().diagnosticTarget();
+        var report = verification.selectorDiagnostics();
+        var steps = report.scenarios() == null || report.scenarios().isEmpty() ? List.of(report) : report.scenarios();
+        var failures = issue.rows().stream().filter(row -> row.status() == SelectorDiagnosticReport.Result.FAIL).toList();
+        return !failures.isEmpty() && steps.stream().anyMatch(step -> step.pageType() == issue.pageType()
+                && step.status() == SelectorDiagnosticReport.Status.CHECKED
+                && step.summary() == SelectorDiagnosticReport.Summary.PASSED
+                && (issue.tabId() != null && issue.tabId().equals(step.tabId())
+                    || target != null && target.repairGroup() != null
+                        && failures.stream().allMatch(row -> row.group().equals(target.repairGroup())))
+                && failures.stream().allMatch(old -> step.rows().stream().anyMatch(row -> row.group().equals(old.group())
+                    && row.key().equals(old.key()) && (row.status() == SelectorDiagnosticReport.Result.PASS
+                        || !old.required() && row.status() == SelectorDiagnosticReport.Result.NOT_APPLICABLE))));
     }
 
     public synchronized BrowserAgentCommand findById(UUID commandId) {
@@ -463,7 +666,8 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
         commands.replaceAll((commandId, command) -> {
             if (completingScans.contains(commandId)) return command;
             boolean queuedExpired = command.status() == BrowserAgentCommandStatus.QUEUED
-                    && !now.isBefore(command.createdAt().plusSeconds(60));
+                    && !now.isBefore(command.createdAt().plusSeconds(command.type() == BrowserAgentCommandType.FOCUS_VACANCY
+                        || command.type() == BrowserAgentCommandType.FOCUS_DIAGNOSTIC ? 540 : 60));
             boolean runningExpired = command.status() == BrowserAgentCommandStatus.IN_PROGRESS
                     && command.startedAt() != null
                     && !now.isBefore(command.startedAt().plus(effectiveTimeout(command.type())));
@@ -495,6 +699,9 @@ public class BrowserAgentCommandService implements BrowserRuntimeGateway, Search
     }
 
     private Duration effectiveTimeout(BrowserAgentCommandType type) {
+        if (type == BrowserAgentCommandType.OPEN_URL) return Duration.ofSeconds(100);
+        // Selector repair may perform two independently bounded generation jobs before checking the page.
+        if (type == BrowserAgentCommandType.DIAGNOSE_SELECTORS) return Duration.ofMinutes(12);
         if (type == BrowserAgentCommandType.DISCOVER_RESUMES) return Duration.ofSeconds(90);
         if (type == BrowserAgentCommandType.INSPECT_APPLICATION) return Duration.ofSeconds(60);
         // Includes up to 210 seconds of generation before the independently bounded HH flow.
