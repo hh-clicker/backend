@@ -1,0 +1,22 @@
+Logback core and classic 1.5.38
+
+These unmodified libraries are distributed here under the Eclipse Public License 2.0
+option offered by upstream. Their source code is available under that license.
+This choice applies to Logback, not to the original HH Clicker code.
+
+Corresponding source archives:
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.38/logback-core-1.5.38-sources.jar
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.38/logback-classic-1.5.38-sources.jar
+
+Complete upstream source at this version:
+https://github.com/qos-ch/logback/tree/v_1.5.38
+https://github.com/qos-ch/logback/archive/refs/tags/v_1.5.38.tar.gz
+
+Upstream license selection and copyright notice:
+https://raw.githubusercontent.com/qos-ch/logback/v_1.5.38/LICENSE.txt
+
+The accompanying EPL-2.0.txt is the standard EPL-2.0 text from:
+https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/EPL-2.0.txt
+
+Update this versioned notice set when upgrading Logback. Licenses already supplied
+inside other dependency JARs remain in those JARs and are not replaced by this set.

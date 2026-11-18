@@ -196,3 +196,11 @@ hhclicker.bootstrap.schemaAuthor и hhclicker.bootstrap.notificationsAuthor за
 [архитектуре](ARCHITECTURE.md#persistence-и-миграции).
 
 [Архитектура](ARCHITECTURE.md) · [Инструкция агенту](AGENTS.md)
+
+## License
+
+HH Clicker original code and documentation are licensed under the [MIT License](LICENSE).
+Third-party components retain their own licenses and notices.
+The Logback 1.5.38 notice set, EPL-2.0 terms and corresponding-source locations in
+`licenses/logback-1.5.38` are embedded in the backend JAR under `META-INF/licenses/hh-clicker`.
+Update this set when upgrading Logback; it supplements the notices in dependency JARs.

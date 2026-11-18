@@ -4,6 +4,8 @@ WORKDIR /workspace
 
 COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
+COPY licenses ./licenses
+COPY LICENSE ./LICENSE
 RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
 
 COPY src ./src
@@ -17,6 +19,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar app.jar
+COPY LICENSE ./LICENSE
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

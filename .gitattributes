@@ -14,3 +14,6 @@
 *.zip binary
 *.msi binary
 *.exe binary
+
+# Preserve upstream legal text verbatim, including its original whitespace.
+licenses/logback-1.5.38/LICENSE.txt -text -whitespace

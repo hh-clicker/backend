@@ -37,3 +37,8 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+tasks.processResources {
+    from("licenses") { into("META-INF/licenses/hh-clicker") }
+    from("LICENSE") { into("META-INF/licenses/hh-clicker") }
+}
